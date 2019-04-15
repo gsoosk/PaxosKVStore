@@ -1,0 +1,81 @@
+// Definition of protos and RPC services for keyvaluestore.
+
+syntax = "proto3";
+
+package keyvaluestore;
+
+message EmptyMessage {
+}
+
+// GET request message containing a key
+message GetRequest {
+  string key = 1;
+}
+
+// GET response message containing the value associated with the key
+message GetResponse {
+  string value = 1;
+}
+
+// PUT request message containing a key and a value
+message PutRequest {
+  string key = 1;
+  string value = 2;
+}
+
+// DELETE request message containing a key
+message DeleteRequest {
+  string key = 1;
+}
+
+
+// A key-value storage service
+service KeyValueStore {
+  // Get the corresponding value for a given key
+  rpc GetValue (GetRequest) returns (GetResponse) {}
+
+  // Put a (key, value) pair into the store
+  rpc PutPair (PutRequest) returns (EmptyMessage) {}
+
+  // Delete the corresponding pair from the store for a given key
+  rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
+}
+
+message TransactionId{
+  string server_id = 1;
+  int32 local_trans_id = 2;
+}
+
+enum VoteDecision{
+  UNKNOWN = 0;
+  COMMIT = 1;
+  ABORT = 2;
+};
+
+message VoteRequest{
+  TransactionId trans_id = 1;
+  oneof vote_request_oneof{
+    PutRequest put_request = 2;
+    DeleteRequest del_request = 3;
+  }
+}
+
+message VoteResponse{
+  VoteDecision decision = 1;
+  // Only present if the decision is to abort.
+  string abort_reason = 2;
+}
+
+message CommitRequest{
+  TransactionId trans_id = 1;
+  VoteDecision decision = 3;
+}
+
+
+service TwoPhaseCommit {
+  // Coordinator -> Participant.
+  rpc Vote(VoteRequest) returns (VoteResponse) {}
+  // Coordinator -> Participant.
+  rpc Commit(CommitRequest) returns (EmptyMessage) {}
+}
+
