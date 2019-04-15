@@ -2,15 +2,29 @@
 #define KV_DATABASE_H
 
 #include <grpcpp/grpcpp.h>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
+#include "keyvaluestore.grpc.pb.h"
 
 namespace keyvaluestore {
+
+struct ValueStatus {
+  ValueStatus();
+  struct PaxosLog {
+    int promised_id;
+    int accepted_id;
+    OperationType accepted_type;
+    string accepted_value;
+  };
+  string value;
+  std::shared_mutex key_mutex;
+  std::map<int, PaxosLog> paxos_logs;
+};
 
 // An in-memory implementation of a key-value database.
 //
@@ -49,22 +63,14 @@ class KeyValueDataBase {
 
   // Locks a given key-value pair. The lock will be auto-released when
   // the return value is out of scope.
-  grpc::Status TryLock(const std::string& lock_key, const std::string& key);
-
-  // Unlocks a `key` locked by `lock_key`. Returns a object that,
-  // (1) Can be used to mutate the corresponding value safely.
-  // (2) Performs the actual unlock upon destruction, so that subsequent
-  // TryLock attempts on that `key` can succeed.
-  ValueMutator Unlock(const std::string& lock_key, const std::string& key);
+  ValueStatus* GetValueStatus(const std::string& key);
+  void SetValueStatus(const std::string& key, int round, int promised_id);
+  void SetValueStatus(const std::string& key, int round, int accepted_id,
+                      OperationType accepted_type, string accepted_value);
+  ValueMutator GetValueMutator(const std::string& key);
 
  private:
-  // Key is lock_key. Value is the key in the in_memory_map_.
-  std::unordered_map<std::string, std::string> lock_key_map_;
-  // Same content as above, but key-value relations are reversed.
-  std::unordered_map<std::string, std::string> rev_lock_key_map_;
-  std::shared_mutex lock_map_mtx_;
-
-  std::unordered_map<std::string, std::string> data_map_;
+  std::map<std::string, ValueStatus> data_map_;
   std::shared_mutex data_mtx_;
   friend class ValueMutator;
 };

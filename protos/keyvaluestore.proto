@@ -41,41 +41,80 @@ service KeyValueStore {
   rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
 }
 
-message TransactionId{
-  string server_id = 1;
-  int32 local_trans_id = 2;
-}
-
-enum VoteDecision{
-  UNKNOWN = 0;
-  COMMIT = 1;
-  ABORT = 2;
+enum OperationType{
+  GET = 0;
+  SET = 1;
+  DELETE = 2;
 };
 
-message VoteRequest{
-  TransactionId trans_id = 1;
-  oneof vote_request_oneof{
-    PutRequest put_request = 2;
-    DeleteRequest del_request = 3;
-  }
+// round: the id of the current Paxos instance.
+// propose_id: the id of the proposal in current Paxos run.
+message PrepareRequest {
+  string key = 1;
+  int32 round = 2;
+  int32 propose_id = 3;
 }
 
-message VoteResponse{
-  VoteDecision decision = 1;
-  // Only present if the decision is to abort.
-  string abort_reason = 2;
+// round: the id of the current Paxos instance.
+// propose_id: the id of the proposal in current Paxos run.
+// accepted_id: the highest accepted propose_id (if present).
+// value: the value of last accepted proposal to set value for a key.
+// do_delete: the decision of last accepted proposal to delete a pair. 
+message PromiseResponse {
+  int32 round = 1;
+  int32 propose_id = 2;
+  int32 accepted_id = 3;
+  OperationType type = 4;
+  string value = 5;
 }
 
-message CommitRequest{
-  TransactionId trans_id = 1;
-  VoteDecision decision = 3;
+// round: the id of the current Paxos instance.
+// propose_id: the id of the proposal in current Paxos run.
+// value: the value proposed to set for a key.
+// do_delete: the proposal to delete a pair. 
+message ProposeRequest {
+  string key = 1;
+  int32 round = 2;
+  int32 propose_id = 3;
+  OperationType type = 4;
+  string value = 5;
 }
 
-
-service TwoPhaseCommit {
-  // Coordinator -> Participant.
-  rpc Vote(VoteRequest) returns (VoteResponse) {}
-  // Coordinator -> Participant.
-  rpc Commit(CommitRequest) returns (EmptyMessage) {}
+// round: the id of the current Paxos instance.
+// propose_id: the id of the proposal in current Paxos run.
+// value: the value accepted to set for a key.
+// do_delete: the decision accepted to delete a pair. 
+message AcceptResponse {
+  int32 round = 1;
+  int32 propose_id = 2;
+  OperationType type = 3;
+  string value = 4;
 }
 
+// round: the id of the current Paxos instance.
+// propose_id: the id of the proposal in current Paxos run.
+// value: the value accepted by quorum to set for a key.
+// do_delete: the decision accepted by quorum to delete a pair. 
+message InformRequest {
+  string key = 1;
+  AcceptResponse acceptance = 2;
+}
+
+// RPC service for information exchange between Paxos proposers, acceptors and learners.
+service Paxos {
+  // Phase 1. Proposer(Leader) -> Acceptors.
+  rpc Prepare(PrepareRequest) returns (PromiseResponse) {}
+  // Phase 2. Proposer(Leader) -> Acceptors.
+  rpc Propose(ProposeRequest) returns (AcceptResponse) {}
+  // Phase 3. Proposer(Leader) -> Learners.
+  rpc Inform(InformRequest) returns (EmptyMessage) {}
+}
+
+// A server should broadcast a Greeting message to others every time it's brough up.
+message Greeting {
+  int32 leader_id = 1;
+}
+
+service Recover {
+  rpc Greet(Greeting) returns (EmptyMessage) {}
+}

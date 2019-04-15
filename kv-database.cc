@@ -4,6 +4,8 @@ namespace keyvaluestore {
 
 using grpc::Status;
 
+PaxosStatus() : round(0), promised_id(0), accepted_id(0) {}
+
 KeyValueDataBase::ValueMutator::~ValueMutator() {
   std::unique_lock<std::shared_mutex> writer_lock(kv_db_->lock_map_mtx_);
   kv_db_->rev_lock_key_map_.erase(key_);

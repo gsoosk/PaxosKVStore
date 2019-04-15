@@ -1,4 +1,4 @@
-Project 3  by Jiahan Zhu
+Project 4  by Jiahan Zhu
 ===================================
 
 This project utilizes gRPC as the framework for client and server communication.
@@ -41,21 +41,16 @@ or
 # Executive Summary
 ## Assignment Overview
 
-The design for the RPC interfaces is in the `keyvaluestore.proto` file. As compared with the previous project, the main design changes are,
-
-1.  We have `N` (N==5) servers instead of 1.
-2.  Implements the two-phase commit protocol to ensure the transactional consisteny for data updates, i.e., `put` and `delete`.
-
-To achieve the above, each server now exports two RPC services. The first one is the original `get`/`put`/`delete`, and is open to clients. The second one is to be used as a participant, and will be called by the replica/coordinator that actually receives the `get`/`put`/`delete` requests. The replica that gets the client request becomes the coordinator, and will consult with the rest replicas via the second RPC service, to see if a consensus can be reached for a commit. The coordinator will proceed by sending a subsequent RPC call to all replicas, either to confirm the commit, or to abort the commit, depending on the outcome of the consensus.
-
-It's assumed that no replica would ever crash, so no permanent storage was used. Both the commit preparation and the actual commit will directly operate on the data in RAM.
+### Assumptions
+* Any server may be down and recovered any time.
+* Each server is assigned a priority and the one with the highest priority among all active servers plays the role of Leader. This strategy makes sure when the current leader is down, servers will know who is the next leader.
+* Only Leader is allowed to propose, i.e., any server will forward its client requests to Leader, and let Leader propose for them.
+* After accepting a proposal, acceptors will respond with their acceptances to Leader, whose role now is a distinguished learner responsible for informing other learners when a value has been chosen.
+* GET is handled by Leader, but does NOT go through PAXOS.
 
  
 
 ## Technical Impression
-
-The most challenging part for me is how to design the data structure and how to separate the interfaces. This really helped me get more familiar with OOP in C++. Anther challenge is how to bring up the replicated servers so that they know each other. After some thoughts, I decided to make the C++ implementations fully describe one replicated server, and configure the cluster of servers separatedly in Python.
-The improvements I can think of is to finalize the test cases. More specifically, I could have tests that send highly concurrent RPC requests and verify both the correctness and the performance of the program.
 
 
 
