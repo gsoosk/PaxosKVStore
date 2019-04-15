@@ -23,9 +23,6 @@ class MultiPaxosServiceImpl final : public MultiPaxos::Service {
                       const InformRequest* request,
                       EmptyMessage* response) override;
 
-  grpc::Status Greet(grpc::ServerContext* context, const Greeting* request,
-                     EmptyMessage* response) override;
-
  private:
   KeyValueDataBase* kv_db_;
 };
