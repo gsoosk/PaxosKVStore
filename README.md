@@ -19,11 +19,12 @@ run command `make` from folder keyvaluestore/
 `python run_server.py <NUM_REPLICAS>`. 
 The server addresses can be accessed locally as  `0.0.0.0`, where the port numbers will start from `8000` and increment by 1 for each of the replica. E.g., `num_replicas==5` will bring up five servers, `0.0.0.0:8000`, `0.0.0.0:8001`, `0.0.0.0:8002`, `0.0.0.0:8003`, and `0.0.0.0:8004`.
 
-The server can also be brought up manually by,
-`./server <SERVER_ADDR> <ADDR_OF_TWO_PHASE_SERVICE> <ADDR_OF_TWO_PHASE_SERVICE_1> <ADDR_OF_TWO_PHASE_SERVICE_2>..."`
-(and a bunch of replica servers)
+You can run individual servers by,
+`./server <SERVER_ADDR> <NUM_REPLICAS> <ADDR_OF_REPLICA_1> <ADDR_OF_REPLICA_1> <ADDR_OF_REPLICA_2>..."`
+(Note: The server itself should be included in <ADDR_OF_REPLICA>s)
+
 In the simplest case where we only need one server, the script looks like,
-`./server <SERVER_ADDR> <ADDR_OF_TWO_PHASE_SERVICE>"`
+`./server <SERVER_ADDR> <ADDR_OF_REPLICA_1>"` with <ADDR_OF_REPLICA_1> = <SERVER_ADDR>
 
 
 
