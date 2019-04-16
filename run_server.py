@@ -10,8 +10,11 @@ if __name__== "__main__":
 		server_addresses.append(("0.0.0.0:"+ str(8000+i), "0.0.0.0:"+ str(9000+i)))
 	for i in range(num_replicas):
 		argv = ["./server"]
+		# Set server address to listen for client requsts.
 		argv.append(server_addresses[i][0])
+		# Set server address to listen for Paxos requsts.
 		argv.append(server_addresses[i][1])
+		# Paxos addresses of other server replicas to communicate with.
 		for j in range(num_replicas):
 			if j != i:
 				argv.append(server_addresses[j][1])
