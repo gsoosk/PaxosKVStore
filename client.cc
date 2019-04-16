@@ -187,7 +187,7 @@ void RunClient(const std::string& server_address) {
 
 int main(int argc, char** argv) {
   // Set server address.
-  std::string server_address = "localhost:3800";
+  std::string server_address = "localhost:8000";
   if (argc <= 1) {
     TIME_LOG << "Server address unspecified." << std::endl;
   } else {
