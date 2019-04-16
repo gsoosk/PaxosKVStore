@@ -15,8 +15,8 @@
 
 #include "kv-database.h"
 #include "kv-store-service-impl.h"
+#include "multi-paxos-service-impl.h"
 #include "time_log.h"
-#include "two-phase-commit.h"
 
 void StartService(const std::string& server_address, grpc::Service* service) {
   grpc::ServerBuilder builder;
@@ -35,41 +35,41 @@ void StartService(const std::string& server_address, grpc::Service* service) {
 int main(int argc, char** argv) {
   // Set server address.
   if (argc <= 2) {
-    std::cerr
-        << "Usage: server-main [addr] [addr_of_two_phase_service] "
-           "[addr_of_two_phase_service_1] [addr_of_two_phase_service_2]..."
-           "[address_2] ..."
-        << std::endl;
+    std::cerr << "Usage: server-main [addr] [paxos_address] "
+                 "[addr_of_paxos_service_1] [addr_of_paxos_service_2]..."
+              << std::endl;
     return -1;
   }
-  std::vector<std::unique_ptr<keyvaluestore::TwoPhaseCommit::Stub>>
+  std::map<std::string, std::unique_ptr<keyvaluestore::MultiPaxos::Stub>>
       participants;
   for (int i = 2; i < argc; ++i) {
-    participants.push_back(
-        std::make_unique<keyvaluestore::TwoPhaseCommit::Stub>(
-            grpc::CreateChannel(std::string(argv[i]),
-                                grpc::InsecureChannelCredentials())));
-    TIME_LOG << "Adding " << std::string(argv[i]) << " to the participant list."
+    const std::string paxos_address = std::string(argv[i]);
+    participants[paxos_address] =
+        std::make_unique<keyvaluestore::MultiPaxos::Stub>(grpc::CreateChannel(
+            paxos_address, grpc::InsecureChannelCredentials()));
+    TIME_LOG << "Adding " << paxos_address << " to the participant list."
              << std::endl;
   }
+  keyvaluestore::PaxosStubsMap paxos_stubs_map(std::move(participants));
   keyvaluestore::KeyValueDataBase kv_db;
   const std::string keyvaluestore_address = std::string(argv[1]);
-  const std::string two_phase_address = std::string(argv[2]);
+  const std::string my_paxos_address = std::string(argv[2]);
   keyvaluestore::KeyValueStoreServiceImpl keyvaluestore_service(
-      keyvaluestore_address, std::move(participants), &kv_db);
-  keyvaluestore::TwoPhaseCommitServiceImpl two_phase_commit_service(&kv_db);
+      &paxos_stubs_map);
+  keyvaluestore::MultiPaxosServiceImpl multi_paxos_service(&paxos_stubs_map,
+                                                           &kv_db);
   // Starts KeyValueStoreService in a detached thread.
   std::thread keyvaluestore_thread(StartService, keyvaluestore_address,
                                    &keyvaluestore_service);
   TIME_LOG << "KeyValueStoreService listening on " << keyvaluestore_address
            << std::endl;
-  // Starts TwoPhaseCommitService in a detached thread.
-  std::thread two_phase_commit_thread(StartService, two_phase_address,
-                                      &two_phase_commit_service);
-  TIME_LOG << "TwoPhaseCommitService listening on " << two_phase_address
+  // Starts MultiPaxosService in a detached thread.
+  std::thread multi_paxos_thread(StartService, my_paxos_address,
+                                 &multi_paxos_service);
+  TIME_LOG << "MultiPaxosService listening on " << my_paxos_address
            << std::endl;
   keyvaluestore_thread.join();
-  two_phase_commit_thread.join();
+  multi_paxos_thread.join();
   TIME_LOG << "Shutting down!" << std::endl;
   return 0;
 }
