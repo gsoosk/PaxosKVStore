@@ -32,14 +32,23 @@ bool KeyValueDataBase::DeleteEntry(const std::string& key) {
   return found;
 }
 
-// Returns the given key's mapped Paxos logs.
+// Returns the mapped Paxos log for given key & round.
 // A new element will be constructed using its default constructor and inserted
-// if key is not found.
-std::map<int, PaxosLog> KeyValueDataBase::GetPaxosLogs(const std::string& key) {
+// if key or round is not found.
+PaxosLog KeyValueDataBase::GetPaxosLog(const std::string& key, int round) {
   std::shared_lock<std::shared_mutex> reader_lock(kv_db_->paxos_logs_mtx_);
-  return kv_db_->paxos_logs_map_[key];
+  return kv_db_->paxos_logs_map_[key][round];
 }
 
+// Returns the latest Paxos round number for the given key.
+// A new element will be constructed using its default constructor and
+// inserted if key is not found.
+// Returns 0 if round is not found for given key.
+int KeyValueDataBase::GetLatestRound(const std::string& key) {
+  std::shared_lock<std::shared_mutex> reader_lock(kv_db_->paxos_logs_mtx_);
+  if (kv_db_->paxos_logs_map_[key].empty()) return 0;
+  return kv_db_->paxos_logs_map_[key].rbegin()->first;
+}
 // Update the promised_id in paxos_logs_map_ for the given key and round.
 void KeyValueDataBase::AddPaxosLog(const std::string& key, int round,
                                    int promised_id) {

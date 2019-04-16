@@ -28,7 +28,7 @@ struct PaxosLog {
 // Thread-safe.
 class KeyValueDataBase {
  public:
-  // Return whether the value is found.
+  // Returns whether the value is found.
   bool GetValue(std::string* value);
   // Returns true if the value is overwritten, false if the key-val
   // pair is newly added.
@@ -36,9 +36,16 @@ class KeyValueDataBase {
   // Returns true if the deletion actually happens, false if the key
   // didn't exist.
   bool DeleteEntry();
-  // Returns reference to the PaxosLogs of a given key.
-  // A new entry with empty value will be created if key doesn't exist.
-  const std::map<int, PaxosLog>& GetPaxosLogs(const std::string& key);
+  // Returns the mapped Paxos log for given key & round.
+  // A new element will be constructed using its default constructor and
+  // inserted if key or round is not found.
+  PaxosLog GetPaxosLog(const std::string& key, int round);
+
+  // Returns the latest Paxos round number for the given key.
+  // A new element will be constructed using its default constructor and
+  // inserted if key or round is not found.
+  int GetLatestRound(const std::string& key);
+
   // Add PaxosLog when Acceptor promises a proposal.
   void AddPaxosLog(const std::string& key, int round, int promised_id);
   // Add PaxosLog when Acceptor accepts a proposal.
