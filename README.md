@@ -13,7 +13,7 @@ Follow the instructions here: https://github.com/grpc/grpc/blob/master/BUILDING.
 Follow the instructions here: https://github.com/protocolbuffers/protobuf/blob/master/src/README.md
 
 # Build
-run command `make` from folder keyvaluestore/
+run command `make` from folder keyvaluestore-paxos/
 
 # Run the server
 ### Run each server individually
@@ -31,8 +31,9 @@ You can run each server individually by,
 
 ### Run all servers at once
 You can also run all of them using one command,  
-`python run_server.py <NUM_REPLICAS>`. 
-The server addresses can be accessed locally as  `0.0.0.0`, where the port numbers will start from `8000` and increment by 1 for each of the replica.  E.g., `<NUM_REPLICAS>==5` is equivalent to the example above. It will bring up five servers, available to clients at `0.0.0.0:8000`, `0.0.0.0:8001`, `0.0.0.0:8002`, `0.0.0.0:8003`, and `0.0.0.0:8004`.
+`python run_server.py <NUM_REPLICAS>`.   
+The server addresses can be accessed locally as  `0.0.0.0`, where the port numbers will start from `8000` and increment by 1 for each of the replica.   
+E.g., `<NUM_REPLICAS>==5` is equivalent to the example above. It will bring up five servers, available to clients at `0.0.0.0:8000`, `0.0.0.0:8001`, `0.0.0.0:8002`, `0.0.0.0:8003`, and `0.0.0.0:8004`.
 
 
 
