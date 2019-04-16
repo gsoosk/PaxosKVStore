@@ -101,21 +101,37 @@ message InformRequest {
   AcceptResponse acceptance = 2;
 }
 
+message RecoverResponse {
+  message PaxosLog {
+    int32 promised_id = 1;
+    int32 accepted_id = 2;
+    OperationType accepted_type = 3;
+    string accepted_value = 4;
+  }
+  message PaxosLogs {
+    map<int32, PaxosLog> logs = 1;
+  }
+  map<string, PaxosLogs> paxos_logs_map = 1;
+}
+
 // RPC service for information exchange between Paxos proposers, acceptors and learners.
-service Paxos {
-  // Phase 1. Proposer(Leader) -> Acceptors.
+service MultiPaxos {
+  // Get the corresponding value for a given key
+  rpc GetValue (GetRequest) returns (GetResponse) {}
+  // Put a (key, value) pair into the store
+  rpc PutPair (PutRequest) returns (EmptyMessage) {}
+  // Delete the corresponding pair from the store for a given key
+  rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
+
+  // Phase 1. Proposer(Coordinator) -> Acceptors.
   rpc Prepare(PrepareRequest) returns (PromiseResponse) {}
-  // Phase 2. Proposer(Leader) -> Acceptors.
+  // Phase 2. Proposer(Coordinator) -> Acceptors.
   rpc Propose(ProposeRequest) returns (AcceptResponse) {}
-  // Phase 3. Proposer(Leader) -> Learners.
+  // Phase 3. Proposer(Coordinator) -> Learners.
   rpc Inform(InformRequest) returns (EmptyMessage) {}
-}
 
-// A server should broadcast a Greeting message to others every time it's brough up.
-message Greeting {
-  int32 leader_id = 1;
-}
-
-service Recover {
-  rpc Greet(Greeting) returns (EmptyMessage) {}
+  // Test if the server is available.
+  rpc Ping(EmptyMessage) returns (EmptyMessage) {}
+  // After brought up, a server will catch up with others' logs.
+  rpc Recover(EmptyMessage) returns (RecoverResponse) {}
 }
