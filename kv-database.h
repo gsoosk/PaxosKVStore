@@ -7,23 +7,20 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include "keyvaluestore.grpc.pb.h"
 
 namespace keyvaluestore {
+using PaxosLogsMap = std::unordered_map<std::string, std::map<int, PaxosLog>>;
 
-struct ValueStatus {
-  ValueStatus();
-  struct PaxosLog {
-    int promised_id;
-    int accepted_id;
-    OperationType accepted_type;
-    string accepted_value;
-  };
-  string value;
-  std::shared_mutex key_mutex;
-  std::map<int, PaxosLog> paxos_logs;
+struct PaxosLog {
+  PaxosLog() : promised_id(0), accepted_id(0) {}
+  int promised_id;
+  int accepted_id;
+  OperationType accepted_type;
+  string accepted_value;
 };
 
 // An in-memory implementation of a key-value database.
@@ -31,48 +28,28 @@ struct ValueStatus {
 // Thread-safe.
 class KeyValueDataBase {
  public:
-  // A scoped mutator that,
-  // (1) Can be used to mutate the corresponding value safely.
-  // (2) Performs the actual unlock upon destruction.
-  class ValueMutator {
-   public:
-    ValueMutator(const ValueMutator&) = delete;
-    ValueMutator operator=(const ValueMutator&) = delete;
-    ValueMutator(ValueMutator&&) = default;
-    ValueMutator& operator=(ValueMutator&&) = default;
-    ~ValueMutator();
-
-    // Return whether the value is found.
-    bool GetValue(std::string* value);
-    // Returns true if the value is overwritten, false if the key-val
-    // pair is newly added.
-    bool SetValue(const std::string& val);
-    // Returns true if the deletion actually happens, false if the key
-    // didn't exist.
-    bool DeleteEntry();
-
-   private:
-    ValueMutator(const std::string& key, const std::string& lock_key,
-                 KeyValueDataBase* kv_db)
-        : key_(key), lock_key_(lock_key), kv_db_(kv_db) {}
-    const std::string key_;
-    const std::string lock_key_;
-    KeyValueDataBase* kv_db_;
-    friend class KeyValueDataBase;
-  };
-
-  // Locks a given key-value pair. The lock will be auto-released when
-  // the return value is out of scope.
-  ValueStatus* GetValueStatus(const std::string& key);
-  void SetValueStatus(const std::string& key, int round, int promised_id);
-  void SetValueStatus(const std::string& key, int round, int accepted_id,
-                      OperationType accepted_type, string accepted_value);
-  ValueMutator GetValueMutator(const std::string& key);
+  // Return whether the value is found.
+  bool GetValue(std::string* value);
+  // Returns true if the value is overwritten, false if the key-val
+  // pair is newly added.
+  bool SetValue(const std::string& val);
+  // Returns true if the deletion actually happens, false if the key
+  // didn't exist.
+  bool DeleteEntry();
+  // Returns reference to the PaxosLogs of a given key.
+  // A new entry with empty value will be created if key doesn't exist.
+  const std::map<int, PaxosLog>& GetPaxosLogs(const std::string& key);
+  // Add PaxosLog when Acceptor promises a proposal.
+  void AddPaxosLog(const std::string& key, int round, int promised_id);
+  // Add PaxosLog when Acceptor accepts a proposal.
+  void AddPaxosLog(const std::string& key, int round, int accepted_id,
+                   OperationType accepted_type, string accepted_value);
 
  private:
-  std::map<std::string, ValueStatus> data_map_;
+  std::unordered_map<std::string, std::string> data_map_;
   std::shared_mutex data_mtx_;
-  friend class ValueMutator;
+  PaxosLogsMap paxos_logs_map_;
+  std::shared_mutex paxos_logs_mtx_;
 };
 
 }  // namespace keyvaluestore

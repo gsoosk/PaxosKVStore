@@ -9,15 +9,15 @@ using grpc::Status;
 Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
                                       const PrepareRequest* request,
                                       PromiseResponse* response) {
-  std::string key = request->get_key();
-  int round = request->get_round();
-  int propose_id = request->get_propose_id();
+  std::string key = request->key();
+  int round = request->round();
+  int propose_id = request->propose_id();
   response->set_round(round);
   response->set_propose_id(propose_id);
-  auto* value_status = kv_db_->GetValueStatus(key);
-  auto it = value_status->paxos_logs.find(round);
-  if (it != value_status->paxos_logs.end()) {
-    auto paxos_log = it->second;
+  auto paxos_logs = kv_db_->GetPaxosLogs(key);
+  auto it = paxos_logs.find(round);
+  if (it != paxos_logs.end()) {
+    const PaxosLog& paxos_log = it->second;
     // Will NOT accept PrepareRequests with propose_id <= promised_id.
     if (paxos_log.promised_id >= propose_id) {
       return Status(grpc::StatusCode::ABORTED,
@@ -30,7 +30,7 @@ Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
     }
   }
   // Update promised id in db.
-  kv_db_->SetValueStatus(key, round, propose_id);
+  kv_db_->AddPaxosLog(key, round, propose_id);
   return Status::OK;
 }
 
@@ -39,26 +39,26 @@ Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
 Status MultiPaxosServiceImpl::Propose(grpc::ServerContext* context,
                                       const ProposeRequest* request,
                                       AcceptResponse* response) {
-  std::string key = request->get_key();
-  int round = request->get_round();
-  int propose_id = request->get_propose_id();
-  auto* value_status = kv_db_->GetValueStatus(key);
-  auto it = value_status->paxos_logs.find(round);
-  if (it != value_status->paxos_logs.end()) {
-    auto paxos_log = it->second;
+  std::string key = request->key();
+  int round = request->round();
+  int propose_id = request->propose_id();
+  auto paxos_logs = kv_db_->GetPaxosLogs(key);
+  auto it = paxos_logs.find(round);
+  if (it != paxos_logs.end()) {
+    const PaxosLog& paxos_log = it->second;
     // Will NOT accept ProposeRequests with propose_id < promised_id.
     if (paxos_log.promised_id > propose_id) {
       return Status(grpc::StatusCode::ABORTED,
                   "Proposal ID is too low.";
     } else {
       // Respond with acceptance and update accepted proposal in db.
-      auto type = request->get_type();
-      std::string value = request->get_value();
+      auto type = request->type();
+      std::string value = request->value();
       response->set_round(round);
       response->set_propose_id(propose_id);
       response->set_type(type);
       response->set_value(value);
-      kv_db_->SetValueStatus(key, round, propose_id, type, value);
+      kv_db_->AddPaxosLog(key, round, propose_id, type, value);
     }
   }
   return Status::OK;
@@ -69,29 +69,25 @@ Status MultiPaxosServiceImpl::Propose(grpc::ServerContext* context,
 Status MultiPaxosServiceImpl::Inform(grpc::ServerContext* context,
                                      const InformRequest* request,
                                      EmptyMessage* response) {
-  std::string key = request->get_key();
-  auto acceptance = request->get_acceptance();
-  int round = acceptance.get_round();
-  auto type = acceptance.get_type();
+  std::string key = request->key();
+  auto acceptance = request->acceptance();
   // Update Paxos log in db.
-  kv_db_->SetValueStatus(key, round, acceptance.get_propose_id(), type,
-                         acceptance.get_value());
+  kv_db_->AddPaxosLog(key, acceptance.round(), acceptance.propose_id(),
+                      acceptance.type(), acceptance.value());
   // Obtain updated value status from db.
-  auto* value_status = kv_db_->GetValueStatus(key);
+  auto paxos_logs = kv_db_->GetPaxosLogs(key);
   // Will NOT execute operation if it's not the latest round.
-  if (round < value_status->paxos_logs.rbegin()->first) {
+  if (acceptance.round() < paxos_logs.rbegin()->first) {
     return Status(grpc::StatusCode::ABORTED,
                   "Operation overwritten by others.";
   }
   // Execute operation.
-  switch (acceptance.get_type()) {
-    case SET:
-      KeyValueDataBase::ValueMutator val_m = kv_db_->GetValueMutator(key);
-      val_m.SetValue(acceptance.get_value());
+  switch (acceptance.type()) {
+    case OperationType::SET:
+      kv_db_->SetValue(key, acceptance.value());
       break;
-    case DELET:
-      KeyValueDataBase::ValueMutator val_m = kv_db_->GetValueMutator(key);
-      val_m.DeleteEntry();
+    case OperationType::DELET:
+      kv_db_->DeleteEntry(key);
       break;
     default:
       break;

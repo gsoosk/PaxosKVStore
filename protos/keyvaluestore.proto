@@ -42,9 +42,10 @@ service KeyValueStore {
 }
 
 enum OperationType{
-  GET = 0;
-  SET = 1;
-  DELETE = 2;
+  NOTSET = 0;
+  GET = 1;
+  SET = 2;
+  DELETE = 3;
 };
 
 // round: the id of the current Paxos instance.
