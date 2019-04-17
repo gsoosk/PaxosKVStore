@@ -77,7 +77,6 @@ class MultiPaxosServiceImpl final : public MultiPaxos::Service {
   KeyValueDataBase* kv_db_;
   PaxosStubsMap* paxos_stubs_map_;
   std::shared_mutex log_mtx_;
-  bool is_recovered_;
 };
 
 }  // namespace keyvaluestore

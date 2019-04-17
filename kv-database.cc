@@ -54,6 +54,12 @@ PaxosLog KeyValueDataBase::GetPaxosLog(const std::string& key, int round) {
   return paxos_logs_map_[key][round];
 }
 
+// Returns a copy of paxos_logs_map_.
+std::unordered_map<std::string, std::map<int, keyvaluestore::PaxosLog>>
+KeyValueDataBase::GetPaxosLogsMap() {
+  return paxos_logs_map_;
+}
+
 // Returns the latest Paxos round number for the given key.
 // A new element will be constructed using its default constructor and
 // inserted if key is not found.

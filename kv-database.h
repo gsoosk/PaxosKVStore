@@ -42,6 +42,9 @@ class KeyValueDataBase {
   // Returns a copy of PaxosLogsMap of a key.
   std::map<int, keyvaluestore::PaxosLog> GetPaxosLogs(const std::string& key);
 
+  // Returns a copy of paxos_logs_map_.
+  std::unordered_map<std::string, std::map<int, keyvaluestore::PaxosLog>>
+  GetPaxosLogsMap();
   // Returns the mapped Paxos log for given key & round.
   // A new element will be constructed using its default constructor and
   // inserted if key or round is not found.

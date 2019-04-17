@@ -46,11 +46,9 @@ Status MultiPaxosServiceImpl::Initialize() {
   }
   Status recover_status = GetRecovery();
   if (!recover_status.ok()) {
-    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "GetRecovery Failed: " << recover_status.error_message()
-             << std::endl;
+    return Status(grpc::StatusCode::ABORTED,
+                  "GetRecovery Failed: " + recover_status.error_message());
   }
-  is_recovered_ = true;
   return Status::OK;
 }
 
@@ -62,12 +60,7 @@ Status MultiPaxosServiceImpl::GetValue(ServerContext* context,
     return Status(grpc::StatusCode::CANCELLED,
                   "Deadline exceeded or Client cancelled, abandoning.");
   }
-  if (!is_recovered_) {
-    return Status(grpc::StatusCode::UNAVAILABLE,
-                  "This replica is not recovered yet.");
-  }
   std::string key = request->key();
-  TIME_LOG << "key:" << key << std::endl;
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "[" << my_paxos_address_ << "] "
@@ -180,10 +173,6 @@ Status MultiPaxosServiceImpl::GetCoordinator(grpc::ServerContext* context,
     return Status(grpc::StatusCode::CANCELLED,
                   "Deadline exceeded or Client cancelled, abandoning.");
   }
-  if (!is_recovered_) {
-    return Status(grpc::StatusCode::UNAVAILABLE,
-                  "This replica is not recovered yet.");
-  }
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "[" << my_paxos_address_ << "] "
@@ -233,7 +222,7 @@ Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
   response->set_round(round);
   response->set_propose_id(propose_id);
   PaxosLog paxos_log = kv_db_->GetPaxosLog(key, round);
-  double fail_rate = 0.3;
+  double fail_rate = 0.4;
   std::stringstream promise_msg;
   promise_msg << "[Promised] [key: " << key << ", round: " << round
               << ", propose_id: " << propose_id;
@@ -283,7 +272,7 @@ Status MultiPaxosServiceImpl::Propose(grpc::ServerContext* context,
   int round = request->round();
   int propose_id = request->propose_id();
   PaxosLog paxos_log = kv_db_->GetPaxosLog(key, round);
-  double fail_rate = 0.3;
+  double fail_rate = 0.4;
   std::stringstream accept_msg;
   // Will NOT accept ProposeRequests with propose_id < promised_id.
   if (paxos_log.promised_id() > propose_id) {
@@ -378,23 +367,22 @@ Status MultiPaxosServiceImpl::Inform(grpc::ServerContext* context,
 Status MultiPaxosServiceImpl::Recover(grpc::ServerContext* context,
                                       const EmptyMessage* request,
                                       RecoverResponse* response) {
-  if (context->IsCancelled()) {
-    return Status(grpc::StatusCode::CANCELLED,
-                  "Deadline exceeded or Client cancelled, abandoning.");
-  }
-  if (!is_recovered_) {
-    return Status(grpc::StatusCode::UNAVAILABLE,
-                  "This replica is not recovered yet.");
-  }
   auto kv_map = kv_db_->GetDataMap();
+  auto paxos_logs_map = kv_db_->GetPaxosLogsMap();
   *response->mutable_kv_map() = google::protobuf::Map<std::string, std::string>(
       kv_map.begin(), kv_map.end());
-  for (const auto& kv : kv_map) {
-    const std::string& key = kv.first;
-    const auto& paxos_logs = kv_db_->GetPaxosLogs(key);
+  // for (const auto& kv : kv_map) {
+  //   const std::string& key = kv.first;
+  //   const auto& paxos_logs = kv_db_->GetPaxosLogs(key);
+  //   *(*response->mutable_paxos_logs())[key].mutable_logs() =
+  //       google::protobuf::Map<int, PaxosLog>(paxos_logs.begin(),
+  //                                            paxos_logs.end());
+  // }
+  for (const auto& paxos_logs : paxos_logs_map) {
+    const std::string& key = paxos_logs.first;
     *(*response->mutable_paxos_logs())[key].mutable_logs() =
-        google::protobuf::Map<int, PaxosLog>(paxos_logs.begin(),
-                                             paxos_logs.end());
+        google::protobuf::Map<int, PaxosLog>(paxos_logs.second.begin(),
+                                             paxos_logs.second.end());
   }
   return Status::OK;
 }
@@ -648,13 +636,12 @@ Status MultiPaxosServiceImpl::GetCoordinator() {
     return Status(grpc::StatusCode::ABORTED,
                   "Failed to get Coordinator addresses.");
   }
-  // if (live_paxos_stubs.find(*coordinators.begin()) == live_paxos_stubs.end())
-  // {
-  //   std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-  //   TIME_LOG << "[" << my_paxos_address_ << "] "
-  //            << "Coordinator is unavailable." << std::endl;
-  //   return Status(grpc::StatusCode::ABORTED, "Coordinator is unavailable.");
-  // }
+  if (live_paxos_stubs.find(*coordinators.begin()) == live_paxos_stubs.end()) {
+    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "[" << my_paxos_address_ << "] "
+             << "Coordinator is unavailable." << std::endl;
+    return Status(grpc::StatusCode::ABORTED, "Coordinator is unavailable.");
+  }
   paxos_stubs_map_->SetCoordinator(*coordinators.begin());
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
@@ -689,27 +676,24 @@ Status MultiPaxosServiceImpl::GetRecovery() {
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "[" << my_paxos_address_ << "] "
-             << "Sending RecoverRequest to replicas." << std::endl;
+             << "Sending RecoverRequest to Coordinator." << std::endl;
   }
   assert(paxos_stubs_map_ != nullptr);
-  auto paxos_stubs = paxos_stubs_map_->GetPaxosStubs();
-  Status recover_status;
+  auto* coordinator_stub = paxos_stubs_map_->GetCoordinatorStub();
+  ClientContext context;
+  auto deadline =
+      std::chrono::system_clock::now() + std::chrono::milliseconds(5000);
+  context.set_deadline(deadline);
+  EmptyMessage recover_req;
   RecoverResponse recover_resp;
-  for (const auto& stub : paxos_stubs) {
-    ClientContext context;
-    auto deadline =
-        std::chrono::system_clock::now() + std::chrono::milliseconds(5000);
-    context.set_deadline(deadline);
-    EmptyMessage recover_req;
-    recover_status = stub.second->Recover(&context, recover_req, &recover_resp);
-    if (recover_status.ok()) break;
-  }
+  Status recover_status =
+      coordinator_stub->Recover(&context, recover_req, &recover_resp);
   if (!recover_status.ok()) {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "[" << my_paxos_address_ << "] "
-             << "Failed to get Recovery from replicas." << std::endl;
+             << "Failed to get Recovery from Coordinator." << std::endl;
     return Status(grpc::StatusCode::ABORTED,
-                  "Failed to get Recovery from replicas.");
+                  "Failed to get Recovery from Coordinator.");
   }
 
   for (const auto& kv : recover_resp.kv_map()) {
@@ -725,19 +709,16 @@ Status MultiPaxosServiceImpl::GetRecovery() {
     }
   }
   auto tmp_kv_db = kv_db_->GetDataMap();
+  auto tmp_paxos = kv_db_->GetPaxosLogsMap();
   for (const auto& kv : tmp_kv_db) {
     TIME_LOG << "[key: " << kv.first << ", value: " << kv.second << "]"
              << std::endl;
-    auto tmp_logs = kv_db_->GetPaxosLogs(kv.first);
-    for (const auto& lg : tmp_logs) {
-      TIME_LOG << "  [round: " << lg.first << "]." << std::endl;
-    }
   }
-  TIME_LOG << "[key: coordinator, value: " << paxos_stubs_map_->GetCoordinator()
-           << "]" << std::endl;
-  auto tmp_logs = kv_db_->GetPaxosLogs("coordinator");
-  for (const auto& lg : tmp_logs) {
-    TIME_LOG << "  [round: " << lg.first << "]." << std::endl;
+  for (const auto& kv : tmp_paxos) {
+    for (const auto& lg : kv.second) {
+      TIME_LOG << "[key: " << kv.first << ", round: " << lg.first << "]."
+               << std::endl;
+    }
   }
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
