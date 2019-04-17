@@ -18,7 +18,9 @@
 #include "multi-paxos-service-impl.h"
 #include "time_log.h"
 
-void StartService(const std::string& server_address, grpc::Service* service) {
+std::unique_ptr<grpc::Server> InitializeService(
+    const std::string& service_name, const std::string& server_address,
+    grpc::Service* service) {
   grpc::ServerBuilder builder;
   // Listen on the given address without any authentication mechanism.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -28,11 +30,13 @@ void StartService(const std::string& server_address, grpc::Service* service) {
   // Finally assemble the server.
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
   // Wait for the server to shutdown.
-  TIME_LOG << "Server running: " << server_address << std::endl;
-  server->Wait();
+  TIME_LOG << service_name << " Listening On: " << server_address << std::endl;
+  return std::move(server);
 }
+void StartService(grpc::Server* server) { server->Wait(); }
 
 int main(int argc, char** argv) {
+  srand(time(nullptr));
   // Set server address.
   if (argc <= 2) {
     std::cerr << "Usage: server-main [addr] [paxos_address] "
@@ -47,7 +51,7 @@ int main(int argc, char** argv) {
     participants[paxos_address] =
         std::make_unique<keyvaluestore::MultiPaxos::Stub>(grpc::CreateChannel(
             paxos_address, grpc::InsecureChannelCredentials()));
-    TIME_LOG << "Adding " << paxos_address << " to the participant list."
+    TIME_LOG << "Adding " << paxos_address << " to the Paxos participants list."
              << std::endl;
   }
   keyvaluestore::PaxosStubsMap paxos_stubs_map(std::move(participants));
@@ -55,19 +59,19 @@ int main(int argc, char** argv) {
   const std::string keyvaluestore_address = std::string(argv[1]);
   const std::string my_paxos_address = std::string(argv[2]);
   keyvaluestore::KeyValueStoreServiceImpl keyvaluestore_service(
-      &paxos_stubs_map, my_paxos_address);
-  keyvaluestore::MultiPaxosServiceImpl multi_paxos_service(&paxos_stubs_map,
-                                                           &kv_db);
+      &paxos_stubs_map, keyvaluestore_address, my_paxos_address);
+  keyvaluestore::MultiPaxosServiceImpl multi_paxos_service(
+      &paxos_stubs_map, &kv_db, my_paxos_address);
+  std::unique_ptr<grpc::Server> keyvaluestore_server = InitializeService(
+      "KeyValueStoreService", keyvaluestore_address, &keyvaluestore_service);
+  std::unique_ptr<grpc::Server> multi_paxos_server = InitializeService(
+      "MultiPaxosService", my_paxos_address, &multi_paxos_service);
+
   // Starts KeyValueStoreService in a detached thread.
-  std::thread keyvaluestore_thread(StartService, keyvaluestore_address,
-                                   &keyvaluestore_service);
-  TIME_LOG << "KeyValueStoreService listening on " << keyvaluestore_address
-           << std::endl;
+  std::thread keyvaluestore_thread(StartService, keyvaluestore_server.get());
   // Starts MultiPaxosService in a detached thread.
-  std::thread multi_paxos_thread(StartService, my_paxos_address,
-                                 &multi_paxos_service);
-  TIME_LOG << "MultiPaxosService listening on " << my_paxos_address
-           << std::endl;
+  std::thread multi_paxos_thread(StartService, multi_paxos_server.get());
+  assert(multi_paxos_service.Initialize().ok());
   keyvaluestore_thread.join();
   multi_paxos_thread.join();
   TIME_LOG << "Shutting down!" << std::endl;

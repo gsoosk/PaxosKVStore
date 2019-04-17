@@ -29,7 +29,7 @@ message DeleteRequest {
 }
 
 // SET coordinator for Paxos run
-message SetCoordinatorRequest {
+message ElectCoordinatorRequest {
 	string key = 1;
 	string coordinator = 2;
 }
@@ -52,7 +52,7 @@ service KeyValueStore {
   rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
 }
 
-enum OperationType{
+enum OperationType {
   NOT_SET = 0;
   SET = 1;
   DELETE = 2;
@@ -112,18 +112,19 @@ message InformRequest {
   AcceptResponse acceptance = 2;
 }
 
+message PaxosLog {
+  int32 promised_id = 1;
+  int32 accepted_id = 2;
+  OperationType accepted_type = 3;
+  string accepted_value = 4;
+}
+
 message RecoverResponse {
-  message PaxosLog {
-    int32 promised_id = 1;
-    int32 accepted_id = 2;
-    OperationType accepted_type = 3;
-    string accepted_value = 4;
+  message PaxosLogs {
+    map<int32, PaxosLog> logs = 1;
   }
-  message PaxosStatus {
-  	string value = 1;
-    map<int32, PaxosLog> logs = 2;
-  }
-  map<string, PaxosStatus> snapshot = 1;
+  map<string, string> kv_map = 1;
+  map<string, PaxosLogs> paxos_logs = 2;
 }
 
 // RPC service for information exchange between Paxos proposers, acceptors and learners.
@@ -135,7 +136,7 @@ service MultiPaxos {
   // Delete the corresponding pair from the store for a given key
   rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
   // Update coordinator when old coordinator is unavailable.
-  rpc SetCoordinator(SetCoordinatorRequest) returns (EmptyMessage) {}
+  rpc ElectCoordinator(ElectCoordinatorRequest) returns (EmptyMessage) {}
   // Get the current coordinator.
   rpc GetCoordinator(EmptyMessage) returns (GetCoordinatorResponse) {}
 

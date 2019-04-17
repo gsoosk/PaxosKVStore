@@ -148,10 +148,10 @@ void RunClient(const std::string& server_address) {
   // Instantiate the client.
   KeyValueStoreClient client(
       grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
-  // Prepopulate the key value store.
-  Prepopulate(&client);
-  // Send a number of requests automatically.
-  TestRuns(&client);
+  // // Prepopulate the key value store.
+  // Prepopulate(&client);
+  // // Send a number of requests automatically.
+  // TestRuns(&client);
   TIME_LOG << "Please enter your request: (Separate words with a white space.)"
            << std::endl;
   TIME_LOG

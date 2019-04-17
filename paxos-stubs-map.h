@@ -9,6 +9,8 @@
 #include <string>
 #include <utility>
 
+#include "keyvaluestore.grpc.pb.h"
+
 namespace keyvaluestore {
 using PaxosStubs = std::map<std::string, std::unique_ptr<MultiPaxos::Stub>>;
 

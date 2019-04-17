@@ -41,7 +41,7 @@ all: system-check client server
 client: keyvaluestore.pb.o keyvaluestore.grpc.pb.o client.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
-server: keyvaluestore.pb.o keyvaluestore.grpc.pb.o kv-database.o two-phase-commit.o kv-store-service-impl.o server-main.o
+server: keyvaluestore.pb.o keyvaluestore.grpc.pb.o kv-database.o paxos-stubs-map.o kv-store-service-impl.o multi-paxos-service-impl.o server-main.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 .PRECIOUS: %.grpc.pb.cc

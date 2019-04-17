@@ -28,8 +28,8 @@ MultiPaxos::Stub* PaxosStubsMap::GetCoordinatorStub() {
 }
 
 MultiPaxos::Stub* PaxosStubsMap::GetStub(const std::string& address) {
-  std::shared_lock<std::shared_mutex> reader_lock(coordinator_mtx_);
-  std::shared_lock<std::shared_mutex> reader_lock(stubs_mtx_);
+  std::shared_lock<std::shared_mutex> coordinator_reader_lock(coordinator_mtx_);
+  std::shared_lock<std::shared_mutex> stubs_reader_lock(stubs_mtx_);
   if (address.empty() || stubs_.find(address) == stubs_.end()) return nullptr;
   return stubs_[address].get();
 }

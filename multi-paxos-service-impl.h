@@ -3,16 +3,21 @@
 
 #include <string>
 #include <vector>
+
+#include <grpcpp/grpcpp.h>
+
 #include "keyvaluestore.grpc.pb.h"
 #include "kv-database.h"
+#include "paxos-stubs-map.h"
+#include "time_log.h"
 
 namespace keyvaluestore {
 
 class MultiPaxosServiceImpl final : public MultiPaxos::Service {
  public:
-  explicit MultiPaxosServiceImpl(PaxosStubsMap* paxos_stubs_map,
-                                 KeyValueDataBase* kv_db)
-      : paxos_stubs_map_(paxos_stubs_map), kv_db_(kv_db) {}
+  MultiPaxosServiceImpl(PaxosStubsMap* paxos_stubs_map, KeyValueDataBase* kv_db,
+                        const std::string& my_paxos_address);
+  grpc::Status Initialize();
 
   // Get the corresponding value for a given key.
   grpc::Status GetValue(grpc::ServerContext* context, const GetRequest* request,
@@ -25,9 +30,9 @@ class MultiPaxosServiceImpl final : public MultiPaxos::Service {
                           const DeleteRequest* request,
                           EmptyMessage* response) override;
   // Update coordinator when old coordinator is unavailable.
-  grpc::Status SetCoordinator(grpc::ServerContext* context,
-                              const SetCoordinatorRequest* request,
-                              EmptyMessage* response) override;
+  grpc::Status ElectCoordinator(grpc::ServerContext* context,
+                                const ElectCoordinatorRequest* request,
+                                EmptyMessage* response) override;
   // Get the current coordinator.
   grpc::Status GetCoordinator(grpc::ServerContext* context,
                               const EmptyMessage* request,
@@ -56,14 +61,23 @@ class MultiPaxosServiceImpl final : public MultiPaxos::Service {
                        RecoverResponse* response) override;
 
  private:
+  void SetProposeValue(const ElectCoordinatorRequest& set_cdnt_req,
+                       ProposeRequest* propose_req);
   void SetProposeValue(const PutRequest& put_req, ProposeRequest* propose_req);
   void SetProposeValue(const DeleteRequest& del_req,
                        ProposeRequest* propose_req);
   template <typename Request>
-  Status RunPaxos(const Request& req);
+  grpc::Status RunPaxos(const Request& req);
+  grpc::Status GetCoordinator();
+  grpc::Status ElectNewCoordinator();
+  grpc::Status GetRecovery();
+  bool RandomFail(double fail_rate);
+
+  const std::string my_paxos_address_;
   KeyValueDataBase* kv_db_;
   PaxosStubsMap* paxos_stubs_map_;
   std::shared_mutex log_mtx_;
+  bool is_recovered_;
 };
 
 }  // namespace keyvaluestore
