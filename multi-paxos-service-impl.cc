@@ -25,10 +25,11 @@ using keyvaluestore::RecoverResponse;
 // Construction method.
 MultiPaxosServiceImpl::MultiPaxosServiceImpl(
     PaxosStubsMap* paxos_stubs_map, KeyValueDataBase* kv_db,
-    const std::string& my_paxos_address)
+    const std::string& my_paxos_address, double fail_rate)
     : paxos_stubs_map_(paxos_stubs_map),
       kv_db_(kv_db),
-      my_paxos_address_(my_paxos_address) {}
+      my_paxos_address_(my_paxos_address),
+      fail_rate_(fail_rate) {}
 
 // Find Coordinator and recover data from Coordinator on construction.
 Status MultiPaxosServiceImpl::Initialize() {
@@ -222,7 +223,6 @@ Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
   response->set_round(round);
   response->set_propose_id(propose_id);
   PaxosLog paxos_log = kv_db_->GetPaxosLog(key, round);
-  double fail_rate = 0.4;
   std::stringstream promise_msg;
   promise_msg << "[Promised] [key: " << key << ", round: " << round
               << ", propose_id: " << propose_id;
@@ -230,11 +230,11 @@ Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
   if (paxos_log.promised_id() >= propose_id) {
     return Status(grpc::StatusCode::ABORTED,
                   "Aborted. Proposal ID is too low.");
-  } else if (key != "coordinator" && RandomFail(fail_rate)) {
+  } else if (key != "coordinator" && RandomFail()) {
     std::stringstream fail_msg;
     fail_msg << "[Rejected] Acceptor random-failed on Prepare[key: " << key
              << ", round: " << round << ", propose_id: " << propose_id
-             << "]. (fail_rate=" << fail_rate << ")";
+             << "]. (fail_rate=" << fail_rate_ << ")";
     {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
       TIME_LOG << "[" << my_paxos_address_ << "] " << fail_msg.str()
@@ -272,17 +272,16 @@ Status MultiPaxosServiceImpl::Propose(grpc::ServerContext* context,
   int round = request->round();
   int propose_id = request->propose_id();
   PaxosLog paxos_log = kv_db_->GetPaxosLog(key, round);
-  double fail_rate = 0.4;
   std::stringstream accept_msg;
   // Will NOT accept ProposeRequests with propose_id < promised_id.
   if (paxos_log.promised_id() > propose_id) {
     return Status(grpc::StatusCode::ABORTED,
                   "Aborted. Proposal ID is too low.");
-  } else if (key != "coordinator" && RandomFail(fail_rate)) {
+  } else if (key != "coordinator" && RandomFail()) {
     std::stringstream fail_msg;
     fail_msg << "[Rejected] Acceptor random-failed on Propose[key: " << key
              << ", round: " << round << ", propose_id: " << propose_id
-             << "]. (fail_rate=" << fail_rate << ")";
+             << "]. (fail_rate=" << fail_rate_ << ")";
     {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
       TIME_LOG << "[" << my_paxos_address_ << "] " << fail_msg.str()
@@ -479,7 +478,7 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
     }
   }
   std::stringstream quorum_msg;
-  quorum_msg << "QUORUM on [key: " << prepare_req.key()
+  quorum_msg << "[key: " << prepare_req.key()
              << ", round: " << prepare_req.round()
              << ", propose_id: " << prepare_req.propose_id()
              << "]: " << num_of_promised << " Promise, "
@@ -487,16 +486,16 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
   if (num_of_promised <= num_of_acceptors / 2) {
     {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-      TIME_LOG << "[" << my_paxos_address_ << "] " << quorum_msg.str()
-               << " Failed to reach Quorum." << std::endl;
+      TIME_LOG << "[" << my_paxos_address_ << "] "
+               << "[Failed] QUORUM on " << quorum_msg.str() << std::endl;
     }
     return Status(grpc::StatusCode::ABORTED,
-                  quorum_msg.str() + " Failed to reach Quorum.");
+                  "[Failed] QUORUM on " + quorum_msg.str());
   }
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "[" << my_paxos_address_ << "] " << quorum_msg.str()
-             << " Quorum is reached." << std::endl;
+    TIME_LOG << "[" << my_paxos_address_ << "] "
+             << "[Reached] QUORUM on " << quorum_msg.str() << std::endl;
   }
 
   // Propose.
@@ -547,7 +546,7 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
     }
   }
   std::stringstream consensus_msg;
-  consensus_msg << "CONSENSUS on [key: " << propose_req.key()
+  consensus_msg << "[key: " << propose_req.key()
                 << ", round: " << propose_req.round()
                 << ", propose_id: " << propose_req.propose_id()
                 << ", value: " << propose_req.value()
@@ -556,16 +555,16 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
   if (num_of_accepted <= num_of_acceptors / 2) {
     {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-      TIME_LOG << "[" << my_paxos_address_ << "] " << consensus_msg.str()
-               << " Failed to reach Consensus." << std::endl;
+      TIME_LOG << "[" << my_paxos_address_ << "] "
+               << "[Failed] CONSENSUS on " << consensus_msg.str() << std::endl;
     }
     return Status(grpc::StatusCode::ABORTED,
-                  consensus_msg.str() + " Failed to reach Consensus.");
+                  "[Failed] CONSENSUS on " + consensus_msg.str());
   }
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "[" << my_paxos_address_ << "] " << consensus_msg.str()
-             << " Consensus is reached." << std::endl;
+    TIME_LOG << "[" << my_paxos_address_ << "] "
+             << "[Reached] CONSENSUS on " << consensus_msg.str() << std::endl;
   }
   // Inform Learners.
   InformRequest inform_req;
@@ -728,11 +727,11 @@ Status MultiPaxosServiceImpl::GetRecovery() {
   return Status::OK;
 }
 
-// fail_rate >= 1 will work as fail_rate == 1
-// fail_rate <= 0 will work as fail_rate == 0
-bool MultiPaxosServiceImpl::RandomFail(double fail_rate) {
+// fail_rate_ >= 1 will work as fail_rate_ == 1
+// fail_rate_ <= 0 will work as fail_rate_ == 0
+bool MultiPaxosServiceImpl::RandomFail() {
   double rand_num = rand();
-  if (rand_num / RAND_MAX < fail_rate) return true;
+  if (rand_num / RAND_MAX < fail_rate_) return true;
   return false;
 }
 

@@ -36,6 +36,7 @@ std::unique_ptr<grpc::Server> InitializeService(
 void StartService(grpc::Server* server) { server->Wait(); }
 
 int main(int argc, char** argv) {
+  // Set random number seed for later use.
   srand(time(nullptr));
   // Set server address.
   if (argc <= 2) {
@@ -44,24 +45,23 @@ int main(int argc, char** argv) {
               << std::endl;
     return -1;
   }
-  std::map<std::string, std::unique_ptr<keyvaluestore::MultiPaxos::Stub>>
-      participants;
+  std::map<std::string, std::unique_ptr<keyvaluestore::MultiPaxos::Stub>> stubs;
   for (int i = 2; i < argc; ++i) {
     const std::string paxos_address = std::string(argv[i]);
-    participants[paxos_address] =
-        std::make_unique<keyvaluestore::MultiPaxos::Stub>(grpc::CreateChannel(
-            paxos_address, grpc::InsecureChannelCredentials()));
-    TIME_LOG << "Adding " << paxos_address << " to the Paxos participants list."
+    stubs[paxos_address] = std::make_unique<keyvaluestore::MultiPaxos::Stub>(
+        grpc::CreateChannel(paxos_address, grpc::InsecureChannelCredentials()));
+    TIME_LOG << "Adding " << paxos_address << " to the Paxos stubs list."
              << std::endl;
   }
-  keyvaluestore::PaxosStubsMap paxos_stubs_map(std::move(participants));
+  double fail_rate = 0.3;
+  keyvaluestore::PaxosStubsMap paxos_stubs_map(std::move(stubs));
   keyvaluestore::KeyValueDataBase kv_db;
   const std::string keyvaluestore_address = std::string(argv[1]);
   const std::string my_paxos_address = std::string(argv[2]);
   keyvaluestore::KeyValueStoreServiceImpl keyvaluestore_service(
       &paxos_stubs_map, keyvaluestore_address, my_paxos_address);
   keyvaluestore::MultiPaxosServiceImpl multi_paxos_service(
-      &paxos_stubs_map, &kv_db, my_paxos_address);
+      &paxos_stubs_map, &kv_db, my_paxos_address, fail_rate);
   std::unique_ptr<grpc::Server> keyvaluestore_server = InitializeService(
       "KeyValueStoreService", keyvaluestore_address, &keyvaluestore_service);
   std::unique_ptr<grpc::Server> multi_paxos_server = InitializeService(

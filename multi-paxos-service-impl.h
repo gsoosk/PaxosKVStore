@@ -16,7 +16,7 @@ namespace keyvaluestore {
 class MultiPaxosServiceImpl final : public MultiPaxos::Service {
  public:
   MultiPaxosServiceImpl(PaxosStubsMap* paxos_stubs_map, KeyValueDataBase* kv_db,
-                        const std::string& my_paxos_address);
+                        const std::string& my_paxos_address, double fail_rate);
   grpc::Status Initialize();
 
   // Get the corresponding value for a given key.
@@ -71,12 +71,13 @@ class MultiPaxosServiceImpl final : public MultiPaxos::Service {
   grpc::Status GetCoordinator();
   grpc::Status ElectNewCoordinator();
   grpc::Status GetRecovery();
-  bool RandomFail(double fail_rate);
+  bool RandomFail();
 
   const std::string my_paxos_address_;
   KeyValueDataBase* kv_db_;
   PaxosStubsMap* paxos_stubs_map_;
   std::shared_mutex log_mtx_;
+  double fail_rate_;  // Set Acceptor to randomly fail at a fail_rate_.
 };
 
 }  // namespace keyvaluestore
