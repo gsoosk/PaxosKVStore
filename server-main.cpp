@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   const std::string keyvaluestore_address = std::string(argv[1]);
   const std::string my_paxos_address = std::string(argv[2]);
   keyvaluestore::KeyValueStoreServiceImpl keyvaluestore_service(
-      &paxos_stubs_map);
+      &paxos_stubs_map, my_paxos_address);
   keyvaluestore::MultiPaxosServiceImpl multi_paxos_service(&paxos_stubs_map,
                                                            &kv_db);
   // Starts KeyValueStoreService in a detached thread.

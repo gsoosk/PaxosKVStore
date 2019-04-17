@@ -14,26 +14,46 @@ class MultiPaxosServiceImpl final : public MultiPaxos::Service {
                                  KeyValueDataBase* kv_db)
       : paxos_stubs_map_(paxos_stubs_map), kv_db_(kv_db) {}
 
-  // Get the corresponding value for a given key
+  // Get the corresponding value for a given key.
   grpc::Status GetValue(grpc::ServerContext* context, const GetRequest* request,
                         GetResponse* response) override;
-
-  // Put a (key, value) pair into the store
+  // Put a (key, value) pair into the store.
   grpc::Status PutPair(grpc::ServerContext* context, const PutRequest* request,
                        EmptyMessage* response) override;
+  // Delete the corresponding pair from the store for a given key.
+  grpc::Status DeletePair(grpc::ServerContext* context,
+                          const DeleteRequest* request,
+                          EmptyMessage* response) override;
+  // Update coordinator when old coordinator is unavailable.
+  grpc::Status SetCoordinator(grpc::ServerContext* context,
+                              const SetCoordinatorRequest* request,
+                              EmptyMessage* response) override;
+  // Get the current coordinator.
+  grpc::Status GetCoordinator(grpc::ServerContext* context,
+                              const EmptyMessage* request,
+                              GetCoordinatorResponse* response) override;
 
-  // Delete the corresponding pair from the store for a given key   grpc::Status
-  DeletePair(grpc::ServerContext* context, const DeleteRequest* request,
-             EmptyMessage* response)
-      override;  // Paxos phase 1. Coordinator -> Acceptor.   grpc::Status
-  Prepare(grpc::ServerContext* context, const PrepareRequest* request,
-          PromiseResponse* response)
-      override;  // Paxos phase 2. Coordinator -> Acceptor.   grpc::Status
-  Propose(grpc::ServerContext* context, const ProposeRequest* request,
-          AcceptResponse* response)
-      override;  // Paxos phase 3. Coordinator -> Learner.   grpc::Status
-  Inform(grpc::ServerContext* context, const InformRequest* request,
-         EmptyMessage* response) override;
+  // Paxos phase 1. Coordinator -> Acceptor.
+  grpc::Status Prepare(grpc::ServerContext* context,
+                       const PrepareRequest* request,
+                       PromiseResponse* response) override;
+  // Paxos phase 2. Coordinator -> Acceptor.
+  grpc::Status Propose(grpc::ServerContext* context,
+                       const ProposeRequest* request,
+                       AcceptResponse* response) override;
+  // Paxos phase 3. Coordinator -> Learner.
+  grpc::Status Inform(grpc::ServerContext* context,
+                      const InformRequest* request,
+                      EmptyMessage* response) override;
+
+  // Test if the server is available.
+  grpc::Status Ping(grpc::ServerContext* context, const EmptyMessage* request,
+                    EmptyMessage* response) override;
+
+  // After brought up again, a server will catch up with others' logs.
+  grpc::Status Recover(grpc::ServerContext* context,
+                       const EmptyMessage* request,
+                       RecoverResponse* response) override;
 
  private:
   void SetProposeValue(const PutRequest& put_req, ProposeRequest* propose_req);

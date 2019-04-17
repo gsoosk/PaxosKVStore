@@ -18,8 +18,9 @@ class PaxosStubsMap {
  public:
   PaxosStubsMap(PaxosStubs stubs) : stubs_(std::move(stubs)) {}
   std::string GetCoordinator();
-  void SetCoordinator(const std::string& coordinator);
+  bool SetCoordinator(const std::string& coordinator);
   MultiPaxos::Stub* GetCoordinatorStub();
+  MultiPaxos::Stub* GetStub(const std::string& address);
   std::map<std::string, MultiPaxos::Stub*> GetPaxosStubs();
 
  private:

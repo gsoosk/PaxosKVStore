@@ -28,6 +28,17 @@ message DeleteRequest {
   string key = 1;
 }
 
+// SET coordinator for Paxos run
+message SetCoordinatorRequest {
+	string key = 1;
+	string coordinator = 2;
+}
+
+// GET coordinator for Paxos run
+message GetCoordinatorResponse {
+	string coordinator = 1;
+}
+
 
 // A key-value storage service
 service KeyValueStore {
@@ -42,10 +53,10 @@ service KeyValueStore {
 }
 
 enum OperationType{
-  NOTSET = 0;
-  GET = 1;
-  SET = 2;
-  DELETE = 3;
+  NOT_SET = 0;
+  SET = 1;
+  DELETE = 2;
+  SET_COORDINATOR = 3;
 };
 
 // round: the id of the current Paxos instance.
@@ -108,10 +119,11 @@ message RecoverResponse {
     OperationType accepted_type = 3;
     string accepted_value = 4;
   }
-  message PaxosLogs {
-    map<int32, PaxosLog> logs = 1;
+  message PaxosStatus {
+  	string value = 1;
+    map<int32, PaxosLog> logs = 2;
   }
-  map<string, PaxosLogs> paxos_logs_map = 1;
+  map<string, PaxosStatus> snapshot = 1;
 }
 
 // RPC service for information exchange between Paxos proposers, acceptors and learners.
@@ -122,6 +134,10 @@ service MultiPaxos {
   rpc PutPair (PutRequest) returns (EmptyMessage) {}
   // Delete the corresponding pair from the store for a given key
   rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
+  // Update coordinator when old coordinator is unavailable.
+  rpc SetCoordinator(SetCoordinatorRequest) returns (EmptyMessage) {}
+  // Get the current coordinator.
+  rpc GetCoordinator(EmptyMessage) returns (GetCoordinatorResponse) {}
 
   // Phase 1. Proposer(Coordinator) -> Acceptors.
   rpc Prepare(PrepareRequest) returns (PromiseResponse) {}
@@ -132,6 +148,6 @@ service MultiPaxos {
 
   // Test if the server is available.
   rpc Ping(EmptyMessage) returns (EmptyMessage) {}
-  // After brought up, a server will catch up with others' logs.
+  // After brought up again, a server will catch up with others' logs.
   rpc Recover(EmptyMessage) returns (RecoverResponse) {}
 }

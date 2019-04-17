@@ -12,22 +12,26 @@ Status KeyValueStoreServiceImpl::GetValue(ServerContext* context,
     return Status(grpc::StatusCode::CANCELLED,
                   "Deadline exceeded or Client cancelled, abandoning.");
   }
+  std::string key = request->key();
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "Received Forwarded Request: Get [key: " << request->key()
-             << "]." << std::endl;
+    TIME_LOG << "Received Forwarded Request: Get [key: " << key << "]."
+             << std::endl;
+  }
+  if (key == "coordinator") {
+    return Status(grpc::StatusCode::ABORT, "Illegal keyword");
   }
   assert(kv_db_ != nullptr);
   std::string value;
-  bool get_success = kv_db_->GetValue(&value);
+  bool get_success = kv_db_->GetValue(key, &value);
   if (!get_success) {
     return Status(grpc::StatusCode::NOT_FOUND, "Key not found.");
   }
   response->set_value(value);
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "Returning Response to Request: Get [key: " << request->key()
-             << "]." << std::endl;
+    TIME_LOG << "Returning GetResponse: [key: " << key
+             << ", value: " << response->value() << "]." << std::endl;
   }
   return Status::OK;
 }
@@ -39,16 +43,20 @@ Status KeyValueStoreServiceImpl::PutPair(grpc::ServerContext* context,
     return Status(grpc::StatusCode::CANCELLED,
                   "Deadline exceeded or Client cancelled, abandoning.");
   }
+  std::string key = request->key();
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "Received Forwarded Request: Put [key: " << request->key()
+    TIME_LOG << "Received Forwarded Request: Put [key: " << key)
              << ", value: " << request->value() << "]." << std::endl;
+  }
+  if (key == "coordinator") {
+    return Status(grpc::StatusCode::ABORT, "Illegal keyword");
   }
   // Run a Paxos instance to reach consensus on the operation.
   Status put_status = RunPaxos(*request);
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "Returning Response to Request: Put [key: " << request->key()
+    TIME_LOG << "Returning Response to Request: Put [key: " << key
              << ", value: " << request->value() << "]." << std::endl;
   }
   return put_status;
@@ -61,21 +69,81 @@ Status KeyValueStoreServiceImpl::DeletePair(grpc::ServerContext* context,
     return Status(grpc::StatusCode::CANCELLED,
                   "Deadline exceeded or Client cancelled, abandoning.");
   }
+  std::string key = request->key();
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "Received Forwarded Request: Delete [key: " << request->key()
-             << "]." << std::endl;
+    TIME_LOG << "Received Forwarded Request: Delete [key: " << key << "]."
+             << std::endl;
+  }
+  if (key == "coordinator") {
+    return Status(grpc::StatusCode::ABORT, "Illegal keyword");
   }
   // Run a Paxos instance to reach consensus on the operation.
   Status delete_status = RunPaxos(*request);
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-    TIME_LOG << "Returning Response to Request: Delete [key: " << request->key()
-             << "]." << std::endl;
+    TIME_LOG << "Returning Response to Request: Delete [key: " << key << "]."
+             << std::endl;
   }
   return delete_status;
 }
 
+Status MultiPaxosServiceImpl::SetCoordinator(
+    grpc::ServerContext* context, const SetCoordinatorRequest* request,
+    EmptyMessage* response) {
+  if (context->IsCancelled()) {
+    return Status(grpc::StatusCode::CANCELLED,
+                  "Deadline exceeded or Client cancelled, abandoning.");
+  }
+  {
+    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "Received SetCoordinator Request: [coordinator: "
+             << request->coordinator() << "]." << std::endl;
+  }
+  // Run a Paxos instance to reach consensus on the operation.
+  Status set_status = RunPaxos(*request);
+  {
+    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "Returning Response to Request: SetCoordinator [coordinator: "
+             << request->coordinator() << "]." << std::endl;
+  }
+  return set_status;
+}
+
+Status MultiPaxosServiceImpl::GetCoordinator(grpc::ServerContext* context,
+                                             const EmptyMessage* request,
+                                             GetCoordinatorResponse* response) {
+  if (context->IsCancelled()) {
+    return Status(grpc::StatusCode::CANCELLED,
+                  "Deadline exceeded or Client cancelled, abandoning.");
+  }
+  {
+    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "Received GetCoordinator Request." << std::endl;
+  }
+  assert(paxos_stubs_map_ != nullptr);
+  std::string coordinator = paxos_stubs_map_->GetCoordinator();
+  if (coordinator.empty()) {
+    return Status(grpc::StatusCode::NOT_FOUND, "Coordinator not found.");
+  }
+  response->set_coordinator(coordinator);
+  {
+    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "Returning GetCoordinatorResponse: [coordinator: "
+             << response->coordinator() << "]." << std::endl;
+  }
+  return get_status;
+}
+
+Status MultiPaxosServiceImpl::Ping(grpc::ServerContext* context,
+                                   const EmptyMessage* request,
+                                   EmptyMessage* response) {
+  {
+    std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "Received Ping Request. Returning Response." << std::endl;
+  }
+  return Status::OK;
+}
 // Logic upon receiving a Prepare message.
 // Role: Acceptor
 Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
@@ -163,12 +231,26 @@ Status MultiPaxosServiceImpl::Inform(grpc::ServerContext* context,
     case OperationType::DELETE:
       kv_db_->DeleteEntry(key);
       break;
+    case OperationType::SET_COORDINATOR:
+      paxos_stubs_map_->SetCoordinator(acceptance.value());
+      break;
     default:
       break;
   }
   return Status::OK;
 }
 
+Status MultiPaxosServiceImpl::Recover(grpc::ServerContext* context,
+                                      const EmptyMessage* request,
+                                      RecoverResponse* response) {
+  return Status::OK;
+}
+
+void MultiPaxosServiceImpl::SetProposeValue(
+    const SetCoordinatorRequest& set_cdnt_req, ProposeRequest* propose_req) {
+  *propose_req->set_type(OperationType::SET_COORDINATOR);
+  *propose_req->set_value(set_cdnt_req.value());
+}
 void MultiPaxosServiceImpl::SetProposeValue(const PutRequest& put_req,
                                             ProposeRequest* propose_req) {
   *propose_req->set_type(OperationType::SET);
@@ -195,8 +277,8 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
 
   int num_of_promised = 0;
   int accepted_id = 0;
-  OperationType accepted_type = OperationType::NOTSET;
-  std::string accepted_value = "";
+  OperationType accepted_type = OperationType::NOT_SET;
+  std::string accepted_value;
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "Sending PrepareRequest [key: " << prepare_req.key()
@@ -214,10 +296,14 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
         stub.second->Prepare(&context, prepare_req, &promise_resp);
     if (!promise_status.ok()) {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-      TIME_LOG << "Acceptor " << stub.first
+      TIME_LOG << "  Acceptor " << stub.first
                << " rejected Prepare: " << promise_status.error_message()
                << std::endl;
     } else {
+      {
+        std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+        TIME_LOG << "  Acceptor " << stub.first << " promised." << std::endl;
+      }
       num_of_promised++;
       if (promise_resp.accepted_id() > accepted_id) {
         accepted_id = promise_resp.accepted_id();
@@ -273,14 +359,18 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
         std::chrono::system_clock::now() + std::chrono::milliseconds(5000);
     context.set_deadline(deadline);
     AcceptResponse accept_resp;
-    Status promise_status =
+    Status accept_status =
         stub.second->Propose(&context, propose_req, &accept_resp);
-    if (!promise_status.ok()) {
+    if (!accept_status.ok()) {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-      TIME_LOG << "Acceptor " << stub.first
-               << " rejected Propose: " << promise_status.error_message()
+      TIME_LOG << "  Acceptor " << stub.first
+               << " rejected Propose: " << accept_status.error_message()
                << std::endl;
     } else {
+      {
+        std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+        TIME_LOG << "  Acceptor " << stub.first << " accepted." << std::endl;
+      }
       num_of_accepted++;
       acceptance = accept_resp;
     }
@@ -318,9 +408,12 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
         stub.second->Inform(&context, inform_req, &inform_resp);
     if (!inform_status.ok()) {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
-      TIME_LOG << "Learner " << stub.first
+      TIME_LOG << "  Learner " << stub.first
                << " returned error: " << inform_status.error_message()
                << std::endl;
+    } else {
+      std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+      TIME_LOG << "  Learner " << stub.first << " returned OK." << std::endl;
     }
   }
   return Status::OK;

@@ -29,13 +29,13 @@ struct PaxosLog {
 class KeyValueDataBase {
  public:
   // Returns whether the value is found.
-  bool GetValue(std::string* value);
+  bool GetValue(const std::string& key, std::string* value);
   // Returns true if the value is overwritten, false if the key-val
   // pair is newly added.
-  bool SetValue(const std::string& val);
+  bool SetValue(const std::string& key, const std::string& val);
   // Returns true if the deletion actually happens, false if the key
   // didn't exist.
-  bool DeleteEntry();
+  bool DeleteEntry(const std::string& key);
   // Returns the mapped Paxos log for given key & round.
   // A new element will be constructed using its default constructor and
   // inserted if key or round is not found.

@@ -19,8 +19,10 @@ namespace keyvaluestore {
 // Logic and data behind the server's behavior.
 class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
  public:
-  KeyValueStoreServiceImpl(PaxosStubsMap* paxos_stubs_map)
-      : paxos_stubs_map_(paxos_stubs_map) {}
+  KeyValueStoreServiceImpl(PaxosStubsMap* paxos_stubs_map,
+                           const std::string& my_paxos_address)
+      : paxos_stubs_map_(paxos_stubs_map),
+        my_paxos_address_(my_paxos_address) {}
 
   // Get the corresponding value for a given key
   grpc::Status GetValue(grpc::ServerContext* context, const GetRequest* request,
@@ -36,7 +38,19 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
                           EmptyMessage* response) override;
 
  private:
-  void FindNewCoordinator();
+  Status ForwardToCoordinator(ClientContext* cc, MultiPaxos::Stub* stub,
+                              const GetRequest& request, GetResponse* response);
+  Status ForwardToCoordinator(ClientContext* cc, MultiPaxos::Stub* stub,
+                              const PutRequest& request,
+                              EmptyMessage* response);
+  Status ForwardToCoordinator(ClientContext* cc, MultiPaxos::Stub* stub,
+                              const DeleteRequest& request,
+                              EmptyMessage* response);
+  template <typename Request, typename Response>
+  Status RequestFlow(const Request& request, Response* response);
+  Status GetCoordinator();
+  Status ElectNewCoordinator();
+  const std::string my_paxos_address_;
   PaxosStubsMap* paxos_stubs_map_;
   std::shared_mutex log_mtx_;
 };
