@@ -487,15 +487,15 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
     {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
       TIME_LOG << "[" << my_paxos_address_ << "] "
-               << "[Failed] QUORUM on " << quorum_msg.str() << std::endl;
+               << "[Failed QUORUM] on " << quorum_msg.str() << std::endl;
     }
     return Status(grpc::StatusCode::ABORTED,
-                  "[Failed] QUORUM on " + quorum_msg.str());
+                  "[Failed QUORUM] on " + quorum_msg.str());
   }
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "[" << my_paxos_address_ << "] "
-             << "[Reached] QUORUM on " << quorum_msg.str() << std::endl;
+             << "[Reached QUORUM] on " << quorum_msg.str() << std::endl;
   }
 
   // Propose.
@@ -556,15 +556,15 @@ Status MultiPaxosServiceImpl::RunPaxos(const Request& req) {
     {
       std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
       TIME_LOG << "[" << my_paxos_address_ << "] "
-               << "[Failed] CONSENSUS on " << consensus_msg.str() << std::endl;
+               << "[Failed CONSENSUS] on " << consensus_msg.str() << std::endl;
     }
     return Status(grpc::StatusCode::ABORTED,
-                  "[Failed] CONSENSUS on " + consensus_msg.str());
+                  "[Failed CONSENSUS] on " + consensus_msg.str());
   }
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
     TIME_LOG << "[" << my_paxos_address_ << "] "
-             << "[Reached] CONSENSUS on " << consensus_msg.str() << std::endl;
+             << "[Reached CONSENSUS] on " << consensus_msg.str() << std::endl;
   }
   // Inform Learners.
   InformRequest inform_req;
