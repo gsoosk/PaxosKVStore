@@ -1,0 +1,7 @@
+# Compiled source #
+###################
+*.pb.cc
+*.pb.h
+*.o
+client
+server
