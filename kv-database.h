@@ -39,6 +39,9 @@ class KeyValueDataBase {
   // Returns a copy of data_map_.
   std::unordered_map<std::string, std::string> GetDataMap();
 
+  // Returns a set of keys in paxos_logs_map_.
+  std::unordered_set<std::string> GetPaxosLogKeys();
+
   // Returns a copy of PaxosLogsMap of a key.
   std::map<int, keyvaluestore::PaxosLog> GetPaxosLogs(const std::string& key);
 

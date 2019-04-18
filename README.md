@@ -17,17 +17,18 @@ run command `make` from folder keyvaluestore-paxos/
 
 # Run the server
 ### Run each server individually
-You can run each server individually by,  
-`./server <SERVER_ADDR> <PAXOS_ADDR> <ADDR_OF_PAXOS_1> <ADDR_OF_PAXOS_2>...<ADDR_OF_PAXOS_N>`
-* `<SERVER_ADDR>` will listen for client requests.
-* `<PAXOS_ADDR>` will listen for Paxos messages from other servers.
-* `<ADDR_OF_PAXOS_1> <ADDR_OF_PAXOS_2>...<ADDR_OF_PAXOS_N>` are Paxos Addresses of other servers, which will be used for communication during Paxos runs. In the case of `<NUM_REPLICAS>==5`, there should be 4 other Paxos Addresses. 
+You can run each server individually by, 
+`server "my_addr:'<addr>' my_paxos:'<addr>' fail_rate:<double> replica:'<addr>' ... replica:'<addr>'"`
+* `my_addr` will be used for listening for client requests.
+* `my_paxos` will be used for listening for Paxos messages from other servers.
+* `fail_rate` is the rate at which the server randomly fails as an Acceptor.
+* `replica`s are Paxos Addresses of all server replicas, which will be used for communication during Paxos runs. The address of `my_paxos` should be included as a replica.
 #### For example
-* Server 0 :`./server "0.0.0.0:8000" "0.0.0.0:9000" "0.0.0.0:9001" "0.0.0.0:9002" "0.0.0.0:9003" "0.0.0.0:9004"` 
-* Server 1 :`./server "0.0.0.0:8001" "0.0.0.0:9001" "0.0.0.0:9000" "0.0.0.0:9002" "0.0.0.0:9003" "0.0.0.0:9004"` 
-* Server 2 :`./server "0.0.0.0:8002" "0.0.0.0:9002" "0.0.0.0:9000" "0.0.0.0:9001" "0.0.0.0:9003" "0.0.0.0:9004"` 
-* Server 3 :`./server "0.0.0.0:8003" "0.0.0.0:9003" "0.0.0.0:9000" "0.0.0.0:9001" "0.0.0.0:9002" "0.0.0.0:9004"` 
-* Server 4 :`./server "0.0.0.0:8004" "0.0.0.0:9004" "0.0.0.0:9000" "0.0.0.0:9001" "0.0.0.0:9002" "0.0.0.0:9003"`   
+* Server 0 :`./server "my_addr: '0.0.0.0:8000' my_paxos: '0.0.0.0:9000' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
+* Server 1 :`./server "my_addr: '0.0.0.0:8001' my_paxos: '0.0.0.0:9001' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
+* Server 2 :`./server "my_addr: '0.0.0.0:8002' my_paxos: '0.0.0.0:9002' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
+* Server 3 :`./server "my_addr: '0.0.0.0:8003' my_paxos: '0.0.0.0:9003' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
+* Server 4 :`./server "my_addr: '0.0.0.0:8004' my_paxos: '0.0.0.0:9004' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"`   
 
 ### Run all servers at once
 You can also run all of them using one command,  

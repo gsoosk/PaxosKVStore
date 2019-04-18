@@ -217,8 +217,6 @@ Status MultiPaxosServiceImpl::Prepare(grpc::ServerContext* context,
   int round = request->round();
   int propose_id = request->propose_id();
   // Update round id in db.
-  TIME_LOG << "Adding [key: " << key << ", round: " << round
-           << "] to PaxosLogs." << std::endl;
   kv_db_->AddPaxosLog(key, round);
   response->set_round(round);
   response->set_propose_id(propose_id);
@@ -348,7 +346,7 @@ Status MultiPaxosServiceImpl::Inform(grpc::ServerContext* context,
       }
       break;
     case OperationType::SET_COORDINATOR:
-      kv_db_->SetValue("coordinator", acceptance.value());
+      // kv_db_->SetValue("coordinator", acceptance.value());
       paxos_stubs_map_->SetCoordinator(acceptance.value());
       {
         std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
@@ -708,19 +706,26 @@ Status MultiPaxosServiceImpl::GetRecovery() {
     }
   }
   auto tmp_kv_db = kv_db_->GetDataMap();
-  auto tmp_paxos = kv_db_->GetPaxosLogsMap();
-  for (const auto& kv : tmp_kv_db) {
-    TIME_LOG << "[key: " << kv.first << ", value: " << kv.second << "]"
-             << std::endl;
-  }
-  for (const auto& kv : tmp_paxos) {
-    for (const auto& lg : kv.second) {
-      TIME_LOG << "[key: " << kv.first << ", round: " << lg.first << "]."
-               << std::endl;
-    }
-  }
+  auto tmp_paxos_keys = kv_db_->GetPaxosLogKeys();
   {
     std::unique_lock<std::shared_mutex> writer_lock(log_mtx_);
+    TIME_LOG << "[" << my_paxos_address_ << "] "
+             << "Received recovery snapshot:" << std::endl;
+    TIME_LOG << "[" << my_paxos_address_ << "] "
+             << "KV Data Map:" << std::endl;
+    for (const auto& kv : tmp_kv_db) {
+      TIME_LOG << "[" << my_paxos_address_ << "] "
+               << "  [key: " << kv.first << ", value: " << kv.second << "]"
+               << std::endl;
+    }
+    TIME_LOG << "[" << my_paxos_address_ << "] "
+             << "Paxos Logs:" << std::endl;
+    for (const auto& key : tmp_paxos_keys) {
+      TIME_LOG << "[" << my_paxos_address_ << "] "
+               << "  [key: " << key
+               << ", last round: " << kv_db_->GetLatestRound(key) << "]."
+               << std::endl;
+    }
     TIME_LOG << "[" << my_paxos_address_ << "] "
              << "[Success] Recovered data and paxos logs." << std::endl;
   }

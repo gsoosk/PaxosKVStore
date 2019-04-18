@@ -39,6 +39,15 @@ std::unordered_map<std::string, std::string> KeyValueDataBase::GetDataMap() {
   return data_map_;
 }
 
+// Returns a set of keys in paxos_logs_map_.
+std::unordered_set<std::string> KeyValueDataBase::GetPaxosLogKeys() {
+  std::shared_lock<std::shared_mutex> reader_lock(paxos_logs_mtx_);
+  std::unordered_set<std::string> keys;
+  for (const auto& log : paxos_logs_map_) {
+    keys.insert(log.first);
+  }
+  return keys;
+}
 // Returns a copy of PaxosLogsMap of a key.
 std::map<int, keyvaluestore::PaxosLog> KeyValueDataBase::GetPaxosLogs(
     const std::string& key) {
