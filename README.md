@@ -72,10 +72,10 @@ MultiPaxos is used for server-to-server communication. A KeyValueStore-Service f
 Roles in a Paxos run: Coordinator(Proposer), Acceptor, Learner.  
 * A typical Paxos run has two phases: Prepare and Propose. Since our key value store service requires continuous multi Paxos runs, some optimization was applied to meet project requirements.  
 I divided a Paxos run into four phases: Ping, Prepare, Propose, and Inform.  
-  ** Ping: Coordinator pings every Acceptor to determine the set of live Acceptors (live_set). A Quorum is defined as more than half of live_set's size.
-  ** Prepare: Coordinator sends a PrepareRequest to each Acceptor in live_set. Acceptor decides whether to promise based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
-  ** Propose: If Prepare phase reached Quorum, Coordinator sends a ProposeRequest to each Acceptor in live_set. Acceptor decides whether to accept based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
-  ** Inform: If Propose phase reached Consensus, Coordinator forwards the accepted proposal to Learners. Learner executes the operation in the accepted proposal.
+  * Ping: Coordinator pings every Acceptor to determine the set of live Acceptors (live_set). A Quorum is defined as more than half of live_set's size.
+  * Prepare: Coordinator sends a PrepareRequest to each Acceptor in live_set. Acceptor decides whether to promise based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
+  * Propose: If Prepare phase reached Quorum, Coordinator sends a ProposeRequest to each Acceptor in live_set. Acceptor decides whether to accept based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
+  * Inform: If Propose phase reached Consensus, Coordinator forwards the accepted proposal to Learners. Learner executes the operation in the accepted proposal.
 
 To ensure any server can catch up with other replicas after it's brought up, it goes through an Initialize stage once it's started.
 * Initialize: Server contact other replicas to know who is Coordinator. It then sends request to Coordinator
