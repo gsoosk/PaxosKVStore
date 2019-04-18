@@ -35,13 +35,13 @@ message DeleteRequest {
   string key = 1;
 }
 
-// SET coordinator for Paxos run
+// ELECT Coordinator for Paxos run
 message ElectCoordinatorRequest {
 	string key = 1;
 	string coordinator = 2;
 }
 
-// GET coordinator for Paxos run
+// GET Coordinator for Paxos run
 message GetCoordinatorResponse {
 	string coordinator = 1;
 }
@@ -142,7 +142,7 @@ service MultiPaxos {
   rpc PutPair (PutRequest) returns (EmptyMessage) {}
   // Delete the corresponding pair from the store for a given key
   rpc DeletePair (DeleteRequest) returns (EmptyMessage) {}
-  // Update coordinator when old coordinator is unavailable.
+  // Elect Coordinator.
   rpc ElectCoordinator(ElectCoordinatorRequest) returns (EmptyMessage) {}
   // Get the current coordinator.
   rpc GetCoordinator(EmptyMessage) returns (GetCoordinatorResponse) {}
