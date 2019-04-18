@@ -13,36 +13,61 @@ Follow the instructions here: https://github.com/grpc/grpc/blob/master/BUILDING.
 Follow the instructions here: https://github.com/protocolbuffers/protobuf/blob/master/src/README.md
 
 # Build
-run command `make` from folder keyvaluestore-paxos/
+run command 
+```sh
+$ make
+```
+from folder keyvaluestore-paxos/
 
 # Run the server
 ### Run each server individually
 You can run each server individually by, 
-`server "my_addr:'<addr>' my_paxos:'<addr>' fail_rate:<double> replica:'<addr>' ... replica:'<addr>'"`
+```sh
+$ server "my_addr:'<addr>' my_paxos:'<addr>' fail_rate:<double> replica:'<addr>' ... replica:'<addr>'"
+```
 It takes one argument (besides `server`) containing the following fields:
 * `my_addr` will be used for listening for client requests.
 * `my_paxos` will be used for listening for Paxos messages from other servers.
 * `fail_rate` is the rate at which the server randomly fails as an Acceptor.
 * `(repeated) replica`s are Paxos Addresses of all server replicas, which will be used for communication during Paxos runs. The address of `my_paxos` should be included as a replica.
 #### For example
-* Server 0 :`./server "my_addr: '0.0.0.0:8000' my_paxos: '0.0.0.0:9000' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
-* Server 1 :`./server "my_addr: '0.0.0.0:8001' my_paxos: '0.0.0.0:9001' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
-* Server 2 :`./server "my_addr: '0.0.0.0:8002' my_paxos: '0.0.0.0:9002' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
-* Server 3 :`./server "my_addr: '0.0.0.0:8003' my_paxos: '0.0.0.0:9003' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"` 
-* Server 4 :`./server "my_addr: '0.0.0.0:8004' my_paxos: '0.0.0.0:9004' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"`   
+Start Server 0 :
+```sh
+$ ./server "my_addr: '0.0.0.0:8000' my_paxos: '0.0.0.0:9000' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"
+``` 
+Start Server 1 :
+```sh
+$ ./server "my_addr: '0.0.0.0:8001' my_paxos: '0.0.0.0:9001' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"
+``` 
+Start Server 2 :
+```sh
+$ ./server "my_addr: '0.0.0.0:8002' my_paxos: '0.0.0.0:9002' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"
+``` 
+Start Server 3 :
+```sh
+$ ./server "my_addr: '0.0.0.0:8003' my_paxos: '0.0.0.0:9003' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"
+``` 
+Start Server 4 :
+```sh
+$ ./server "my_addr: '0.0.0.0:8004' my_paxos: '0.0.0.0:9004' fail_rate: 0.3 replica: '0.0.0.0:9000' replica: '0.0.0.0:9001' replica: '0.0.0.0:9002' replica: '0.0.0.0:9003' replica: '0.0.0.0:9004'"
+``` 
 
 ### Run all servers at once
 You can also run all of them using one command,  
-`python run_server.py <NUM_REPLICAS>`.   
-The server addresses can be accessed locally as  `0.0.0.0`, where the port numbers will start from `8000` and increment by 1 for each of the replica.   
-E.g., `<NUM_REPLICAS>==5` is equivalent to the example above. It will bring up five servers, available to clients at `0.0.0.0:8000`, `0.0.0.0:8001`, `0.0.0.0:8002`, `0.0.0.0:8003`, and `0.0.0.0:8004`.
+```sh
+$ python run_server.py <NUM_REPLICAS> <FAIL_RATE>
+```
+This command will start `<NUM_REPLICAS>` Servers. The server addresses can be accessed locally as  `0.0.0.0`, where the port numbers will start from `8000` and increment by 1 for each of the replica. `<FAIL_RATE>` is the rate at which Acceptor randomly fails.  
+For example,  
+* `<NUM_REPLICAS>==5` is equivalent to the example above. It will bring up five servers, available to clients at `0.0.0.0:8000`, `0.0.0.0:8001`, `0.0.0.0:8002`, `0.0.0.0:8003`, and `0.0.0.0:8004`.
+* `<FAIL_RATE>==0.3` -> Acceptor has 30% possibility to fail.
 
 
 
 # Run the client
 `./client`  
 or  
-`./client <SERVER_ADDRESS>` (for example, `./client localhost:8000`)
+`./client <SERVER_ADDRESS>` (for example, `./client 0.0.0.0:8000`)
 
 # Send requests from client
 `GET <KEY>` (for example, `GET apple`)  
@@ -72,13 +97,15 @@ MultiPaxos is used for server-to-server communication. A KeyValueStore-Service f
 Roles in a Paxos run: Coordinator(Proposer), Acceptor, Learner.  
 * A typical Paxos run has two phases: Prepare and Propose. Since our key value store service requires continuous multi Paxos runs, some optimization was applied to meet project requirements.  
 I divided a Paxos run into four phases: Ping, Prepare, Propose, and Inform.  
-  * Ping: Coordinator pings every Acceptor to determine the set of live Acceptors (live_set). A Quorum is defined as more than half of live_set's size.
-  * Prepare: Coordinator sends a PrepareRequest to each Acceptor in live_set. Acceptor decides whether to promise based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
-  * Propose: If Prepare phase reached Quorum, Coordinator sends a ProposeRequest to each Acceptor in live_set. Acceptor decides whether to accept based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
-  * Inform: If Propose phase reached Consensus, Coordinator forwards the accepted proposal to Learners. Learner executes the operation in the accepted proposal.
+  * **Ping**: Coordinator pings every Acceptor to determine the set of live Acceptors (live_set). A Quorum is defined as more than half of live_set's size.
+  * **Prepare**: Coordinator sends a PrepareRequest to each Acceptor in live_set. Acceptor decides whether to promise based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
+  * **Propose**: If Prepare phase reached Quorum, Coordinator sends a ProposeRequest to each Acceptor in live_set. Acceptor decides whether to accept based on the proposal_id. Acceptor is set to fail randomly at a given fail_rate.
+  * **Inform**: If Propose phase reached Consensus, Coordinator forwards the accepted proposal to Learners. Learner executes the operation in the accepted proposal.
 
-To ensure any server can catch up with other replicas after it's brought up, it goes through an Initialize stage once it's started.
-* Initialize: Server contact other replicas to know who is Coordinator. It then sends request to Coordinator
+To ensure any server can catch up with other replicas after it's brought up, it goes through an Initialize stage once it's started.  
+* **Initialize**: Server contacts other replicas to know who is Coordinator. It then sends request to Coordinator to get a snapshot of datastore and paxos logs for recovery.
+
+When any server fails to know who is Coordinator by asking around, or fails to reach Coordinator, it nominates itself and starts a Coordinator election.
 
 
 
