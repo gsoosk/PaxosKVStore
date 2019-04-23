@@ -100,7 +100,7 @@ void Prepopulate(KeyValueStoreClient* client) {
   TIME_LOG << "------------------------------------------------" << std::endl;
   // Send PUT Requests.
   for (auto item : key_values) {
-    TIME_LOG << "Sending request: PUT " << item.first << " " << item.second
+    TIME_LOG << "Prepopulating: " << item.first << " " << item.second
              << std::endl;
     client->PutPair(item.first, item.second);
   }
@@ -110,24 +110,20 @@ void Prepopulate(KeyValueStoreClient* client) {
 void TestRuns(KeyValueStoreClient* client) {
   std::vector<std::pair<std::string, std::string>> key_values = {
       {"banana", "yellow"},
-      {"cherry", "red"},
+      {"coconut", "white"},
       {"blueberry", "blue"},
       {"kiwi", "brown"},
       {"apple", "green"}};
   TIME_LOG << "************************************************" << std::endl;
   TIME_LOG << "Start testing PUT, GET, DELETE operations." << std::endl;
   TIME_LOG << "------------------------------------------------" << std::endl;
-  // Send PUT Requests.
+  // Send DELETE Requests.
   for (auto item : key_values) {
-    TIME_LOG << "Sending request: PUT " << item.first << " " << item.second
-             << std::endl;
-    client->PutPair(item.first, item.second);
+    TIME_LOG << "Sending request: DELETE " << item.first << std::endl;
+    client->DeletePair(item.first);
   }
-  // Change one test case.
-  key_values.pop_back();
-  key_values.push_back({"mandarin", "orange"});
   TIME_LOG << "------------------------------------------------" << std::endl;
-  // Send PUT Requests.
+  // Send GET Requests.
   for (auto item : key_values) {
     TIME_LOG << "Sending request: GET " << item.first << std::endl;
     client->GetValue(item.first);
@@ -135,23 +131,33 @@ void TestRuns(KeyValueStoreClient* client) {
   TIME_LOG << "------------------------------------------------" << std::endl;
   // Send PUT Requests.
   for (auto item : key_values) {
-    TIME_LOG << "Sending request: DELETE " << item.first << std::endl;
-    client->DeletePair(item.first);
+    TIME_LOG << "Sending request: PUT " << item.first << " " << item.second
+             << std::endl;
+    client->PutPair(item.first, item.second);
   }
+  TIME_LOG << "------------------------------------------------" << std::endl;
+  // Send GET Requests.
+  for (auto item : key_values) {
+    TIME_LOG << "Sending request: GET " << item.first << std::endl;
+    client->GetValue(item.first);
+  }
+
   TIME_LOG << "------------------------------------------------" << std::endl;
   TIME_LOG << "End of test." << std::endl;
   TIME_LOG << "************************************************" << std::endl;
 }
 
-void RunClient(const std::string& server_address) {
+void RunClient(const std::string& server_address, bool auto_run) {
   TIME_LOG << "Listening to server_address: " << server_address << std::endl;
   // Instantiate the client.
   KeyValueStoreClient client(
       grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
-  // // Prepopulate the key value store.
-  // Prepopulate(&client);
-  // // Send a number of requests automatically.
-  // TestRuns(&client);
+  if (auto_run) {
+    // Prepopulate the key value store.
+    Prepopulate(&client);
+    // Send a number of requests automatically.
+    TestRuns(&client);
+  }
   TIME_LOG << "Please enter your request: (Separate words with a white space.)"
            << std::endl;
   TIME_LOG
@@ -188,14 +194,29 @@ void RunClient(const std::string& server_address) {
 int main(int argc, char** argv) {
   // Set server address.
   std::string server_address = "localhost:8000";
-  if (argc <= 1) {
-    TIME_LOG << "Server address unspecified." << std::endl;
+  bool auto_run = false;
+  if (argc <= 2) {
+    std::cerr << "Usage: `./client <server_address> <auto_run>`" << std::endl
+              << "Like this:" << std::endl
+              << "`./client 0.0.0.0:8000 true`" << std::endl;
+    return -1;
   } else {
     server_address = argv[1];
+    std::string auto_run_str = ToLowerCase(std::string(argv[2]));
+    if (auto_run_str == "true") {
+      auto_run = true;
+    } else if (auto_run_str == "false") {
+      auto_run = false;
+    } else {
+      std::cerr << "Usage: `./client <server_address> <auto_run>`" << std::endl
+                << "Like this:" << std::endl
+                << "`./client 0.0.0.0:8000 true`" << std::endl;
+      return -1;
+    }
   }
   TIME_LOG << "Server address set to " << server_address << std::endl;
 
-  RunClient(server_address);
+  RunClient(server_address, auto_run);
 
   return 0;
 }

@@ -44,11 +44,11 @@ int main(int argc, char** argv) {
   // Set server address.
   if (argc <= 1) {
     std::cerr
-        << "Usage: `server \"my_addr:'<addr>' my_paxos:'<addr>' fail_rate:"
+        << "Usage: `./server \"my_addr:'<addr>' my_paxos:'<addr>' fail_rate:"
            "<double> replica:'<addr>' ... replica:'<addr>'\"`"
         << std::endl
         << "Like this:" << std::endl
-        << "`server \"my_addr:'0.0.0.0:8000' my_paxos:'0.0.0.0:9000' "
+        << "`./server \"my_addr:'0.0.0.0:8000' my_paxos:'0.0.0.0:9000' "
            "fail_rate:0.3 replica:'0.0.0.0:9000' replica:'0.0.0.0:9001' "
            "replica:'0.0.0.0:9002'\"`"
         << std::endl;
